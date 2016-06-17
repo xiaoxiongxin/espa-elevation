@@ -1107,6 +1107,10 @@ class BaseElevation(object):
             self.add_elevation_band_to_xml(elevation_source)
 
 
+XML_PRODUCT_CODES = ['L1T', 'L1G',
+                     'L1TP', 'L1GT', 'L1GS']
+
+
 class XMLElevation(BaseElevation):
     """Defines the class object for XML based elevation generation"""
 
@@ -1165,7 +1169,7 @@ class XMLElevation(BaseElevation):
                                      .format(product_id))
 
         for band in espa_metadata.xml_object.bands.band:
-            if (band.attrib['product'] in ['L1T', 'L1G', 'L1S', 'L1GT'] and
+            if (band.attrib['product'] in XML_PRODUCT_CODES and
                     band.attrib['name'] == 'band1'):
                 self.target_srs = (
                     Geo.get_proj4_projection_string(str(band.file_name)))
