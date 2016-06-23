@@ -1,2 +1,17 @@
-# espa-elevation
-Provides a script which implements the algorithm we use to generate an elevation image from various sources.
+## ESPA Elevation Generation Version 2.0.0 - Release Notes
+
+Release Date: August 2016
+
+See git tag [2016_Aug]
+
+This project contains application source code for extracting elevation data from external sources and generating an elevation product conforming to the input data.
+
+### Source Elevation Datasets
+* GTOPO30
+* GLS
+* RAMP
+
+## Release Notes
+* Initial project version
+* Migrated from original source location to this project
+* Minor changes for collection based processing
