@@ -17,7 +17,7 @@
 
 # ----------------------------------------------------------------------------
 Name:		%{project}
-Version:	1.0.1
+Version:	2.0.1
 Release:	1.%{build_timestamp}
 Summary:	ESPA Elevation Software
 
