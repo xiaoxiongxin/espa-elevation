@@ -19,7 +19,7 @@ This project contains application source code for extracting elevation data from
 ## Installation
 
 ### Dependencies
-* Python 2.7.X
+* Python 2.7.X and Numpy/GDAL
 * [espa-python-library](https://github.com/USGS-EROS/espa-python-library) 1.0.1
 * [GDAL](http://www.gdal.org/) 1.11.1
   - The command line tools are utilized for some of the processing steps.
