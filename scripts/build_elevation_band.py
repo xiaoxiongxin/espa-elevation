@@ -29,7 +29,7 @@ from espa import MetadataError, Metadata
 from espa import ENVIHeader
 
 
-SOFTWARE_VERSION = 'ELEVATION_2.0.0'
+SOFTWARE_VERSION = 'ELEVATION_2.0.1'
 
 # Environment variable for the location of the elevation sources
 ESPA_ELEVATION_DIR = 'ESPA_ELEVATION_DIR'
