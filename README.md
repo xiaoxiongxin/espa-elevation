@@ -6,11 +6,6 @@ See git tag [v2.0.1]
 
 This project contains application source code for extracting elevation data from external sources and generating an elevation product conforming to the input data.
 
-### External Elevation Datasets
-* GTOPO30
-* GLS
-* RAMP
-
 ## Release Notes
 * Initial project version
 * Migrated from original source location to this project
@@ -20,9 +15,14 @@ This project contains application source code for extracting elevation data from
 
 ### Dependencies
 * Python 2.7.X and Numpy/GDAL
-* [espa-python-library](https://github.com/USGS-EROS/espa-python-library) 1.0.1
+* [espa-python-library](https://github.com/USGS-EROS/espa-python-library) >= 1.0.1
 * [GDAL](http://www.gdal.org/) 1.11.1
   - The command line tools are utilized for some of the processing steps.
+
+### External Elevation Datasets
+* GTOPO30
+* GLS
+* RAMP
 
 ### Environment Variables
 ```
