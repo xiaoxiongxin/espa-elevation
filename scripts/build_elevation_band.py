@@ -15,7 +15,6 @@ import logging
 import glob
 import math
 import datetime
-from cStringIO import StringIO
 from argparse import ArgumentParser
 
 
@@ -24,8 +23,7 @@ from lxml import objectify as objectify
 from osgeo import gdal, osr
 
 
-from espa import XMLError, XMLInterface
-from espa import MetadataError, Metadata
+from espa import Metadata
 from espa import ENVIHeader
 
 
@@ -162,7 +160,7 @@ class Geo(object):
             output = execute_cmd(cmd)
         finally:
             if len(output) > 0:
-                print(output)
+                logger.info(output)
 
 
 class MathError(Exception):
@@ -709,7 +707,7 @@ class BaseElevation(object):
                 output = execute_cmd(cmd)
             finally:
                 if len(output) > 0:
-                    print(output)
+                    logger.info(output)
 
             output = ''
             try:
@@ -717,7 +715,7 @@ class BaseElevation(object):
                 output = execute_cmd(cmd)
             finally:
                 if len(output) > 0:
-                    print(output)
+                    logger.info(output)
 
             os.unlink(tile_arch)
 
@@ -1402,7 +1400,7 @@ def main():
     logger = logging.getLogger(__name__)
 
     if ESPA_ELEVATION_DIR not in os.environ:
-        print('{0} environement variable not defined'
+        print('{0} environment variable not defined'
               .format(ESPA_ELEVATION_DIR))
         sys.exit(1)  # EXIT_FAILURE
 
