@@ -8,7 +8,7 @@
 %define project espa-elevation
 %define build_timestamp %(date +"%%Y%%m%%d%%H%%M%%S")
 # Specify the repository tag/branch to clone and build from
-%define tagname dev_v1.0.0
+%define tagname dev_v2.0.1
 # Specify the name of the directory to clone into
 %define clonedname %{name}-%{tagname}
 # Change the default rpm name format for the rpm built by this spec file
@@ -69,5 +69,5 @@ rm -rf %{buildroot}
 
 # ----------------------------------------------------------------------------
 %changelog
-* Wed Jun 22 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
+* Thu Jun 23 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
 - Initial Version for August 2016 release
