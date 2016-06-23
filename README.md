@@ -2,7 +2,7 @@
 
 Release Date: August 2016
 
-See git tag [2016_Aug]
+See git tag [v2.0.1]
 
 This project contains application source code for extracting elevation data from external sources and generating an elevation product conforming to the input data.
 
