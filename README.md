@@ -38,7 +38,7 @@ make install
 See `build_elevation_band.py --help` for command line details.
 
 ### Data Processing Requirements
-This version of the Land Surface Temperature application requires the input products to be in the ESPA internal file format.
+This version of the Elevation Generation application requires the input products to be in the ESPA internal file format.
 
 The following input data are required to generate the elevation product:
 * Level 1 Source Data

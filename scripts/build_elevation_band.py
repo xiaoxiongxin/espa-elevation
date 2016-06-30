@@ -239,7 +239,7 @@ def execute_cmd(cmd):
     """Execute a command line
 
     The specified command line is executed and the terminal output is returned
-    or an exception is reaised.
+    or an exception is raised.
 
     Returns:
         output (str): The stdout and/or stderr from the executed command.
@@ -290,7 +290,7 @@ class BaseElevation(object):
 
         # Grab what we need from the environment first
         if ESPA_ELEVATION_DIR not in os.environ:
-            raise RuntimeError('{0} environement variable not defined'
+            raise RuntimeError('{0} environment variable not defined'
                                .format(ESPA_ELEVATION_DIR))
         self.espa_elevation_dir = os.environ.get(ESPA_ELEVATION_DIR)
 
