@@ -43,7 +43,23 @@ class Geo(object):
 
     @staticmethod
     def convert_imageXY_to_mapXY(image_x, image_y, transform):
-        """Translate image coordinates into map coordinates"""
+        """Translate image coordinates into map coordinates
+
+        Args:
+            image_x <int>: X coordinate value fromn the image
+            image_y <int>: Y coordinate value fromn the image
+            transform <2x3:float>: GDAL Affine transformation matrix
+                                   [0] - Map X of upper left corner
+                                   [1] - Pixel size in X direction
+                                   [2] - Y rotation
+                                   [3] - Map Y of upper left corner
+                                   [4] - X rotation
+                                   [5] - Pixel size in Y direction
+
+        Returns:
+            <float>: Map X for image X
+            <float>: Map Y for image Y
+        """
 
         map_x = (transform[0] +
                  image_x * transform[1] +
@@ -94,6 +110,21 @@ class Geo(object):
              output_format=None,
              source_data=None,
              output_filename=None):
+        """Generates a gdalwarp command line and executes it
+
+        Args:
+            resampling_method <str>: gdalwarp defined
+            resolution_x <float>: Resoultion to make the output
+            resolution_y <float>: Resoultion to make the output
+            target_srs <str>: Target projection (gdal compliant proj4
+                              projection string)
+            images_extents <dict>: Contains the min and max subset window
+            destination_no_data <float>: No data value for the output
+            output_data_type <str>: gdalwarp defined
+            output_format <str>: gdalwarp defined
+            source_data <str>: Path to the source data
+            output_filename <str>: Path to the output filename
+        """
 
         logger = logging.getLogger(__name__)
 
@@ -124,7 +155,7 @@ class Geo(object):
                         str(image_extents['max_x']),
                         str(image_extents['max_y'])])
 
-        # Add output data type
+        # Add no data value to specify for the output
         if destination_no_data is not None:
             cmd.extend(['-dstnodata', str(destination_no_data)])
 
@@ -184,6 +215,12 @@ class Math(object):
                 http://eni.wikipedia.org
                 /wiki/Point_in_polygon
 
+        Args:
+            vertices <list:x,list:y>: Contains a list of X and Y closed
+                                      polygon vertices
+            x_c <float>: X coordinate to test against the polygon
+            y_c <float>: Y coordinate to test against the polygon
+
         Notes:
             Derived from Landsat IAS code, which is based on above algorithm.
             A closed list is expected.  Where v[N] = v[0]
@@ -219,9 +256,12 @@ class Math(object):
     def longitude_norm(longitude):
         """Calculates the "canonical longitude" for the longitude value
 
+        Args:
+            longitude <float>: Decimal degrees for the longitude
+
         Returns:
-            result (float): Equivalent longitude value in the range
-                            [-180.0, 180.0) degrees
+            result <float>: Equivalent longitude value in the range
+                            (-180.0, 180.0) degrees
         """
 
         result = longitude
@@ -309,6 +349,7 @@ class BaseElevation(object):
         self.glsdem_south_limit = -53.0
 
         # RAMP lat coordinate limits
+        # Defines when we start to use RAMP data
         self.ramp_south_limit = -60.0
 
         # WGS84 GEOID Adjustment Information
@@ -437,7 +478,33 @@ class BaseElevation(object):
                              map_lr_x, map_lr_y,
                              map_ll_x, map_ll_y,
                              map_center_x, map_center_y):
-        """Verify that the input data is covered by the RAMP DEM"""
+        """Verify that the input data is covered by the RAMP DEM
+
+        Args:
+            ramp_lines <int>:
+            ramp_samples <int>:
+            ramp_transform <2x3:float>: GDAL Affine transformation matrix
+                                        [0] - Map X of upper left corner
+                                        [1] - Pixel size in X direction
+                                        [2] - Y rotation
+                                        [3] - Map Y of upper left corner
+                                        [4] - X rotation
+                                        [5] - Pixel size in Y direction
+            map_ul_x <float>: Upper left image X in projection coordinates
+            map_ul_y <float>: Upper left iMage Y in projection coordinates
+            map_ur_x <float>: Upper right image X in projection coordinates
+            map_ur_y <float>: Upper right image Y in projection coordinates
+            map_lr_x <float>: Lower right image X in projection coordinates
+            map_lr_y <float>: Lower right image Y in projection coordinates
+            map_ll_x <float>: Lower left image X in projection coordinates
+            map_ll_y <float>: Lower left image Y in projection coordinates
+            map_center_x <float>: Center image X in projection coordinates
+            map_center_y <float>: Center image Y in projection coordinates
+
+        Returns:
+            Generates RAMPCoverageError exception if image is not contained
+            enough by the RAMP DEM.
+        """
 
         logger = logging.getLogger(__name__)
 
@@ -961,8 +1028,9 @@ class BaseElevation(object):
         band.set('data_type', 'INT16')
         band.set('nlines', str(self.number_of_lines))
         band.set('nsamps', str(self.number_of_samples))
-        # Don't really have a fill value, but setting to -9999 for consistency
-        # with our other INT16 products
+        # Our current sources for elevation do not contain fill and we
+        # populate the entire bounds of the image with elevation values
+        # Setting to -9999 for consistency with our other INT16 products
         band.set('fill_value', '-9999')
 
         # Add elements to the band object
@@ -1361,25 +1429,27 @@ def main():
                    ' metadata as the information source')
     parser = ArgumentParser(description=description)
 
-    parser.add_argument('--mtl', '--mtl_filename',
-                        action='store',
-                        dest='mtl_filename',
-                        default=None,
-                        help='name of Landsat MTL file',
-                        metavar='FILE')
-
-    parser.add_argument('--xml', '--xml_filename',
-                        action='store',
-                        dest='xml_filename',
-                        default=None,
-                        help='name of ESPA XML Metadata file',
-                        metavar='FILE')
-
     parser.add_argument('--debug',
                         action='store_true',
                         dest='debug',
                         default=False,
                         help='turn debug logging on')
+
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument('--mtl', '--mtl_filename',
+                       action='store',
+                       dest='mtl_filename',
+                       default=None,
+                       help='name of Landsat MTL file',
+                       metavar='FILE')
+
+    group.add_argument('--xml', '--xml_filename',
+                       action='store',
+                       dest='xml_filename',
+                       default=None,
+                       help='name of ESPA XML Metadata file',
+                       metavar='FILE')
 
     args = parser.parse_args()
 
@@ -1406,17 +1476,12 @@ def main():
 
     elevation = None
     # Call the core processing
-    if args.mtl_filename is not None:
-        print(args.mtl_filename)
-        elevation = MTLElevation(args.mtl_filename)
-    elif args.xml_filename is not None:
+    if args.xml_filename is not None:
         print(args.xml_filename)
         elevation = XMLElevation(args.xml_filename)
     else:
-        print('Must specify either an MTL or ESPA XML input file\n')
-        parser.print_help()
-        print('')
-        sys.exit(1)  # EXIT_FAILURE
+        print(args.mtl_filename)
+        elevation = MTLElevation(args.mtl_filename)
 
     try:
         elevation.generate()
