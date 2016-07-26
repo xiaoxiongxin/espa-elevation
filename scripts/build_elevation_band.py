@@ -334,7 +334,7 @@ class BaseElevation(object):
                                .format(ESPA_ELEVATION_DIR))
         self.espa_elevation_dir = os.environ.get(ESPA_ELEVATION_DIR)
 
-        # Padding to add to the max box
+        # Padding to add to the max box (degrees)
         self.maxbox_padding = 0.2
 
         # Latitude coordinate limits
@@ -1139,6 +1139,10 @@ class BaseElevation(object):
             self.adjust_elevation_to_wgs84()
 
         else:
+            print('nbound: ', self.bounding_north_latitude)
+            print('sbound: ', self.bounding_south_latitude)
+            print('wbound: ', self.bounding_west_longitude)
+            print('ebound: ', self.bounding_east_longitude)
             try:
                 logger.info('Attempting to use GLS DEM')
                 self.generate_using_gls()
@@ -1178,13 +1182,29 @@ XML_PRODUCT_CODES = ['L1T', 'L1G',
 
 
 class XMLElevation(BaseElevation):
-    """Defines the class object for XML based elevation generation"""
+    """Defines the class object for XML based elevation generation
 
-    def __init__(self, xml_filename):
+       If user_extents is True, then the user-specified min/max x and y
+       geographic extents will be used, instead of the scene extents. However
+       the scene projection and resolution will be used.
+    """
+
+    def __init__(self, xml_filename, user_extents, minx, maxx, miny, maxy,
+                 nbound_lat, sbound_lat, wbound_lon, ebound_lon):
         """Class initialization"""
         super(XMLElevation, self).__init__()
 
         self.xml_filename = xml_filename
+        self.user_extents = user_extents
+        if user_extents:
+            self.min_x_extent = minx
+            self.max_x_extent = maxx
+            self.min_y_extent = miny
+            self.max_y_extent = maxy
+            self.bounding_north_latitude = nbound_lat
+            self.bounding_south_latitude = sbound_lat
+            self.bounding_west_longitude = wbound_lon
+            self.bounding_east_longitude = ebound_lon
 
     def parse_metadata(self):
         """Parse the input metadata file
@@ -1200,29 +1220,32 @@ class XMLElevation(BaseElevation):
         espa_metadata = Metadata()
         espa_metadata.parse(xml_filename=self.xml_filename)
 
-        self.bounding_north_latitude = float(espa_metadata.xml_object
-                                             .global_metadata
-                                             .bounding_coordinates.north)
-        self.bounding_south_latitude = float(espa_metadata.xml_object
-                                             .global_metadata
-                                             .bounding_coordinates.south)
-        self.bounding_east_longitude = float(espa_metadata.xml_object
-                                             .global_metadata
-                                             .bounding_coordinates.east)
-        self.bounding_west_longitude = float(espa_metadata.xml_object
-                                             .global_metadata
-                                             .bounding_coordinates.west)
+        # Read the scene extents if they weren't specified by the user
+        if not self.user_extents:
+            self.bounding_north_latitude = float(espa_metadata.xml_object
+                                                 .global_metadata
+                                                 .bounding_coordinates.north)
+            self.bounding_south_latitude = float(espa_metadata.xml_object
+                                                 .global_metadata
+                                                 .bounding_coordinates.south)
+            self.bounding_east_longitude = float(espa_metadata.xml_object
+                                                 .global_metadata
+                                                 .bounding_coordinates.east)
+            self.bounding_west_longitude = float(espa_metadata.xml_object
+                                                 .global_metadata
+                                                 .bounding_coordinates.west)
 
-        for corner_point in (espa_metadata.xml_object
-                             .global_metadata
-                             .projection_information.corner_point):
-            if corner_point.attrib['location'] == 'UL':
-                self.min_x_extent = float(corner_point.attrib['x'])
-                self.max_y_extent = float(corner_point.attrib['y'])
-            if corner_point.attrib['location'] == 'LR':
-                self.max_x_extent = float(corner_point.attrib['x'])
-                self.min_y_extent = float(corner_point.attrib['y'])
+            for corner_point in (espa_metadata.xml_object
+                                 .global_metadata
+                                 .projection_information.corner_point):
+                if corner_point.attrib['location'] == 'UL':
+                    self.min_x_extent = float(corner_point.attrib['x'])
+                    self.max_y_extent = float(corner_point.attrib['y'])
+                if corner_point.attrib['location'] == 'LR':
+                    self.max_x_extent = float(corner_point.attrib['x'])
+                    self.min_y_extent = float(corner_point.attrib['y'])
 
+        # Read the rest of the scene metadata
         product_id = None
         try:
             product_id = espa_metadata.xml_object.global_metadata.product_id
@@ -1246,29 +1269,56 @@ class XMLElevation(BaseElevation):
                 self.number_of_samples = band.attrib['nsamps']
                 break
 
-        # Adjust the coordinates for image extents becuse they are in
-        # center of pixel, and we need to supply the warping with actual
+        # Adjust the coordinates for image extents from the XML because they
+        # are in center of pixel, and we need to supply the warping with actual
         # extents
-        self.min_x_extent = (self.min_x_extent -
-                             self.pixel_resolution_x * 0.5)
-        self.max_x_extent = (self.max_x_extent +
-                             self.pixel_resolution_x * 0.5)
-        self.min_y_extent = (self.min_y_extent -
-                             self.pixel_resolution_y * 0.5)
-        self.max_y_extent = (self.max_y_extent +
-                             self.pixel_resolution_y * 0.5)
+        if not self.user_extents:
+            self.min_x_extent = (self.min_x_extent -
+                                 self.pixel_resolution_x * 0.5)
+            self.max_x_extent = (self.max_x_extent +
+                                 self.pixel_resolution_x * 0.5)
+            self.min_y_extent = (self.min_y_extent -
+                                 self.pixel_resolution_y * 0.5)
+            self.max_y_extent = (self.max_y_extent +
+                                 self.pixel_resolution_y * 0.5)
+
+        # Determine the number of lines and samples for the user-specified
+        # extents, based on the pixel size
+        if not self.user_extents:
+            self.number_of_samples = int(round(
+                (self.max_x_extent - self.min_x_extent) /
+                 self.pixel_resolution_x))
+            self.number_of_lines = int(round(
+                (self.max_y_extent - self.min_y_extent) /
+                 self.pixel_resolution_y))
 
         del espa_metadata
 
 
 class MTLElevation(BaseElevation):
-    """Defines the class object for MTL based elevation generation"""
+    """Defines the class object for MTL based elevation generation
 
-    def __init__(self, mtl_filename):
+       If user_extents is True, then the user-specified min/max x and y
+       geographic extents will be used, instead of the scene extents. However
+       the scene projection and resolution will be used.
+    """
+
+    def __init__(self, mtl_filename, user_extents, minx, maxx, miny, maxy,
+                 nbound_lat, sbound_lat, wbound_lon, ebound_lon):
         """Class initialization"""
         super(MTLElevation, self).__init__()
 
         self.mtl_filename = mtl_filename
+        self.user_extents = user_extents
+        if user_extents:
+            self.min_x_extent = minx
+            self.max_x_extent = maxx
+            self.min_y_extent = miny
+            self.max_y_extent = maxy
+            self.bounding_north_latitude = nbound_lat
+            self.bounding_south_latitude = sbound_lat
+            self.bounding_west_longitude = wbound_lon
+            self.bounding_east_longitude = ebound_lon
 
     def parse_metadata(self):
         """Parse the input metadata file
@@ -1277,8 +1327,10 @@ class MTLElevation(BaseElevation):
         associated class variables with the values read for that field.
 
         Notes:
-          It is expected the input metadata file is an LPGS _MTL.txt file and
-          follows the format (contains the same fields) of those files.
+          1. It is expected the input metadata file is an LPGS _MTL.txt file and
+             follows the format (contains the same fields) of those files.
+          2. Number of lines and samples is not needed since the DEM is only
+             written to the XML file if an XML file is being processed.
         """
 
         # Get the logger
@@ -1312,37 +1364,43 @@ class MTLElevation(BaseElevation):
                 # logger.debug('    DEBUG: param [{0}]'.format(param))
                 # logger.debug('    DEBUG: value [{0}]'
                 #              .format(value.strip('\"')))
-                if param == 'CORNER_UL_LAT_PRODUCT':
+                # Read the extents only if the user-specified extents were
+                # not provided
+                if param == 'CORNER_UL_LAT_PRODUCT' and not self.user_extents:
                     if f_value > self.bounding_north_latitude:
                         self.bounding_north_latitude = f_value
-                elif param == 'CORNER_UR_LAT_PRODUCT':
+                elif param == 'CORNER_UR_LAT_PRODUCT' and not self.user_extents:
                     if f_value > self.bounding_north_latitude:
                         self.bounding_north_latitude = f_value
-                elif param == 'CORNER_LL_LAT_PRODUCT':
+                elif param == 'CORNER_LL_LAT_PRODUCT' and not self.user_extents:
                     if f_value < self.bounding_south_latitude:
                         self.bounding_south_latitude = f_value
-                elif param == 'CORNER_LR_LAT_PRODUCT':
+                elif param == 'CORNER_LR_LAT_PRODUCT' and not self.user_extents:
                     if f_value < self.bounding_south_latitude:
                         self.bounding_south_latitude = f_value
-                elif param == 'CORNER_UL_LON_PRODUCT':
+                elif param == 'CORNER_UL_LON_PRODUCT' and not self.user_extents:
                     if f_value < self.bounding_west_longitude:
                         self.bounding_west_longitude = f_value
-                elif param == 'CORNER_UR_LON_PRODUCT':
+                elif param == 'CORNER_UR_LON_PRODUCT' and not self.user_extents:
                     if f_value > self.bounding_east_longitude:
                         self.bounding_east_longitude = f_value
-                elif param == 'CORNER_LL_LON_PRODUCT':
+                elif param == 'CORNER_LL_LON_PRODUCT' and not self.user_extents:
                     if f_value < self.bounding_west_longitude:
                         self.bounding_west_longitude = f_value
-                elif param == 'CORNER_LR_LON_PRODUCT':
+                elif param == 'CORNER_LR_LON_PRODUCT' and not self.user_extents:
                     if f_value > self.bounding_east_longitude:
                         self.bounding_east_longitude = f_value
-                elif param == 'CORNER_UL_PROJECTION_X_PRODUCT':
+                elif param == 'CORNER_UL_PROJECTION_X_PRODUCT' and    \
+                     not self.user_extents:
                     self.min_x_extent = f_value
-                elif param == 'CORNER_UL_PROJECTION_Y_PRODUCT':
+                elif param == 'CORNER_UL_PROJECTION_Y_PRODUCT' and    \
+                     not self.user_extents:
                     self.max_y_extent = f_value
-                elif param == 'CORNER_LR_PROJECTION_X_PRODUCT':
+                elif param == 'CORNER_LR_PROJECTION_X_PRODUCT' and    \
+                     not self.user_extents:
                     self.max_x_extent = f_value
-                elif param == 'CORNER_LR_PROJECTION_Y_PRODUCT':
+                elif param == 'CORNER_LR_PROJECTION_Y_PRODUCT' and    \
+                     not self.user_extents:
                     self.min_y_extent = f_value
                 elif param == 'GRID_CELL_SIZE_REFLECTIVE':
                     self.pixel_resolution_x = f_value
@@ -1408,25 +1466,80 @@ class MTLElevation(BaseElevation):
 
         self.target_srs = Geo.get_proj4_projection_string(file_name_band_1)
 
-        # Adjust the coordinates for image extents becuse they are in
-        # center of pixel, and we need to supply the warping with actual
+        # Adjust the coordinates for image extents from the MTL because they
+        # are in center of pixel, and we need to supply the warping with actual
         # extents
-        self.min_x_extent = (self.min_x_extent -
-                             self.pixel_resolution_x * 0.5)
-        self.max_x_extent = (self.max_x_extent +
-                             self.pixel_resolution_x * 0.5)
-        self.min_y_extent = (self.min_y_extent -
-                             self.pixel_resolution_y * 0.5)
-        self.max_y_extent = (self.max_y_extent +
-                             self.pixel_resolution_y * 0.5)
+        if not self.user_extents:
+            self.min_x_extent = (self.min_x_extent -
+                                 self.pixel_resolution_x * 0.5)
+            self.max_x_extent = (self.max_x_extent +
+                                 self.pixel_resolution_x * 0.5)
+            self.min_y_extent = (self.min_y_extent -
+                                 self.pixel_resolution_y * 0.5)
+            self.max_y_extent = (self.max_y_extent +
+                                 self.pixel_resolution_y * 0.5)
+
+
+def check_for_extents(args):
+    """Were custom extents specified?  If so, all extents must be specified.
+    Args:
+        args <args>: Command line arguments
+
+    Returns:
+        <bool>: True if cusom extents were specified, and False if not
+    """
+
+    if (args.extent_minx is not None or args.extent_maxx is not None or
+        args.extent_miny is not None or args.extent_maxy is not None or
+        args.nbound_lat is not None or args.sbound_lat is not None or
+        args.wbound_lon is not None or args.ebound_lon is not None):
+
+        # One of the user-specified extents was specified, so make sure all
+        # were specified
+        if args.extent_minx is None:
+            raise RuntimeError('Must specify --extent-minx when specifying '
+                               'custom extents')
+
+        if args.extent_maxx is None:
+            raise RuntimeError('Must specify --extent-maxx when specifying '
+                               'custom extents')
+
+        if args.extent_miny is None:
+            raise RuntimeError('Must specify --extent-miny when specifying '
+                               'custom extents')
+
+        if args.extent_maxy is None:
+            raise RuntimeError('Must specify --extent-maxy when specifying '
+                               'custom extents')
+
+        if args.nbound_lat is None:
+            raise RuntimeError('Must specify --nbound-lat when specifying '
+                               'custom extents')
+
+        if args.sbound_lat is None:
+            raise RuntimeError('Must specify --sbound-lat when specifying '
+                               'custom extents')
+
+        if args.wbound_lon is None:
+            raise RuntimeError('Must specify --wbound-lon when specifying '
+                               'custom extents')
+
+        if args.ebound_lon is None:
+            raise RuntimeError('Must specify --ebound-lon when specifying '
+                               'custom extents')
+
+        return True
+
+    return False
 
 
 def main():
     """Provides the main processing for the script"""
 
     # get the command line argument for the metadata file
-    description = ('Create an elevation band using either the MTL or XML'
-                   ' metadata as the information source')
+    description = ('Create an elevation band using either the MTL or XML '
+                   'metadata as the information source. Optionally the scene '
+                   'extents can be over-riden with user-specified extents.')
     parser = ArgumentParser(description=description)
 
     parser.add_argument('--debug',
@@ -1451,6 +1564,74 @@ def main():
                        help='name of ESPA XML Metadata file',
                        metavar='FILE')
 
+    # Look for user-specified min/max extents, which would then override the
+    # scene extents
+    geo_extents = parser.add_argument_group('geo_extents',
+        'User-specified geographic extents to over-ride the scene extents. '
+        'The scene projection and reflectance band resolution are used. '
+        'If one of the following parameters is specified they all must be '
+        'specified.')
+
+    geo_extents.add_argument('--extent-minx',
+                             action='store',
+                             dest='extent_minx',
+                             default=None,
+                             metavar='FLOAT',
+                             help='Minimum X direction extent value')
+
+    geo_extents.add_argument('--extent-maxx',
+                             action='store',
+                             dest='extent_maxx',
+                             default=None,
+                             metavar='FLOAT',
+                             help='Maximum X direction extent value')
+
+    geo_extents.add_argument('--extent-miny',
+                             action='store',
+                             dest='extent_miny',
+                             default=None,
+                             metavar='FLOAT',
+                             help='Minimum Y direction extent value')
+
+    geo_extents.add_argument('--extent-maxy',
+                             action='store',
+                             dest='extent_maxy',
+                             default=None,
+                             metavar='FLOAT',
+                             help='Maximum Y direction extent value')
+
+    geo_extents.add_argument('--nbound-lat',
+                             action='store',
+                             dest='nbound_lat',
+                             default=None,
+                             metavar='FLOAT',
+                             help='North-bounding latitude associated with '
+                                  'extent-maxy')
+
+    geo_extents.add_argument('--sbound-lat',
+                             action='store',
+                             dest='sbound_lat',
+                             default=None,
+                             metavar='FLOAT',
+                             help='South-bounding latitude associated with '
+                                  'extent-miny')
+
+    geo_extents.add_argument('--wbound-lon',
+                             action='store',
+                             dest='wbound_lon',
+                             default=None,
+                             metavar='FLOAT',
+                             help='West-bounding longitude associated with '
+                                  'extent-minx')
+
+    geo_extents.add_argument('--ebound-lon',
+                             action='store',
+                             dest='ebound_lon',
+                             default=None,
+                             metavar='FLOAT',
+                             help='East-bounding longitude associated with '
+                                  'extent-maxx')
+
     args = parser.parse_args()
 
     # Check logging level
@@ -1469,19 +1650,56 @@ def main():
 
     logger = logging.getLogger(__name__)
 
+    # Get the environment variable for the elevation data directory
     if ESPA_ELEVATION_DIR not in os.environ:
-        print('{0} environment variable not defined'
-              .format(ESPA_ELEVATION_DIR))
+        logger.info('{0} environment variable not defined'
+                    .format(ESPA_ELEVATION_DIR))
         sys.exit(1)  # EXIT_FAILURE
 
-    elevation = None
+    # Initialize
+    minx = None
+    miny = None
+    maxx = None
+    maxy = None
+    nbound_lat = None
+    sbound_lat = None
+    wbound_lon = None
+    ebound_lon = None
+
+    # Grab the user-specified extents if they exist
+    user_extents = check_for_extents(args)
+    if user_extents:
+        minx = float(args.extent_minx)
+        miny = float(args.extent_miny)
+        maxx = float(args.extent_maxx)
+        maxy = float(args.extent_maxy)
+        nbound_lat = float(args.nbound_lat)
+        sbound_lat = float(args.sbound_lat)
+        wbound_lon = float(args.wbound_lon)
+        ebound_lon = float(args.ebound_lon)
+        logger.info('User-specified geographic extents will be used: '
+                    'extent-minx: {0}  '
+                    'extent-maxx: {1}  '
+                    'extent-miny: {2}  '
+                    'extent-maxy: {3}  '
+                    'nbound-lat: {4}  '
+                    'sbound-lat: {5}  '
+                    'ebound-lon: {6}  '
+                    'wbound-lon: {7}'.format(minx, maxx, miny, maxy, nbound_lat,
+                                             sbound_lat, wbound_lon, ebound_lon))
+
     # Call the core processing
+    elevation = None
     if args.xml_filename is not None:
-        print(args.xml_filename)
-        elevation = XMLElevation(args.xml_filename)
+        logger.info('Processing XML file: {0}'.format(args.xml_filename))
+        elevation = XMLElevation(args.xml_filename, user_extents, minx, maxx,
+                                 miny, maxy, nbound_lat, sbound_lat, wbound_lon,
+                                 ebound_lon)
     else:
-        print(args.mtl_filename)
-        elevation = MTLElevation(args.mtl_filename)
+        logger.info('Processing MTL file: {0}'.format(args.mtl_filename))
+        elevation = MTLElevation(args.mtl_filename, user_extents, minx, maxx,
+                                 miny, maxy, nbound_lat, sbound_lat, wbound_lon,
+                                 ebound_lon)
 
     try:
         elevation.generate()
