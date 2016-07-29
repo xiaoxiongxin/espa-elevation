@@ -324,8 +324,13 @@ class GLSOverWaterError(Exception):
 class BaseElevation(object):
     """Defines the base class object for elevation generation/processing"""
 
-    def __init__(self):
-        """Class initialization"""
+    def __init__(self, elevation_filename):
+        """Class initialization
+        Args:
+        elevation_filename - allows the user to specify the output filename
+                             for the elevation band; if None then the default
+                             filename is used
+        """
         super(BaseElevation, self).__init__()
 
         # Grab what we need from the environment first
@@ -386,11 +391,19 @@ class BaseElevation(object):
         self.gtopo30_files_regexp = '[EW]???[NS]??.*'
         self.gtopo30_padding = 1.0  # Degrees, since we are in geographic
 
-        # Elevation format and naming
+        # Elevation format and naming. If the output elevation filename was
+        # specified then use it otherwise use the default filename.
         self.elevation_format = 'ENVI'
         self.elevation_type_int16 = 'Int16'
-        self.elevation_header_name_fmt = '{0}_elevation.hdr'
-        self.elevation_image_name_fmt = '{0}_elevation.img'
+        if elevation_filename is None:
+            self.elevation_image_name_fmt = '{0}_elevation.img'
+            self.elevation_header_name_fmt = '{0}_elevation.hdr'
+        else:
+            print('DEBUG: elevation filename: {0}'.format(elevation_filename))
+            self.elevation_image_name_fmt = elevation_filename
+            self.elevation_header_name_fmt = elevation_filename.  \
+                                            replace('.img', '.hdr')
+
         # Landsat uses bi-linear for all elevation warping
         self.elevation_resampling_method = 'bilinear'
 
@@ -1190,9 +1203,9 @@ class XMLElevation(BaseElevation):
     """
 
     def __init__(self, xml_filename, user_extents, minx, maxx, miny, maxy,
-                 nbound_lat, sbound_lat, wbound_lon, ebound_lon):
+                 nbound_lat, sbound_lat, wbound_lon, ebound_lon, elev_filename):
         """Class initialization"""
-        super(XMLElevation, self).__init__()
+        super(XMLElevation, self).__init__(elev_filename)
 
         self.xml_filename = xml_filename
         self.user_extents = user_extents
@@ -1304,9 +1317,9 @@ class MTLElevation(BaseElevation):
     """
 
     def __init__(self, mtl_filename, user_extents, minx, maxx, miny, maxy,
-                 nbound_lat, sbound_lat, wbound_lon, ebound_lon):
+                 nbound_lat, sbound_lat, wbound_lon, ebound_lon, elev_filename):
         """Class initialization"""
-        super(MTLElevation, self).__init__()
+        super(MTLElevation, self).__init__(elev_filename)
 
         self.mtl_filename = mtl_filename
         self.user_extents = user_extents
@@ -1319,6 +1332,7 @@ class MTLElevation(BaseElevation):
             self.bounding_south_latitude = sbound_lat
             self.bounding_west_longitude = wbound_lon
             self.bounding_east_longitude = ebound_lon
+
 
     def parse_metadata(self):
         """Parse the input metadata file
@@ -1539,7 +1553,7 @@ def main():
     # get the command line argument for the metadata file
     description = ('Create an elevation band using either the MTL or XML '
                    'metadata as the information source. Optionally the scene '
-                   'extents can be over-riden with user-specified extents.')
+                   'extents can be overriden with user-specified extents.')
     parser = ArgumentParser(description=description)
 
     parser.add_argument('--debug',
@@ -1547,6 +1561,15 @@ def main():
                         dest='debug',
                         default=False,
                         help='turn debug logging on')
+
+    parser.add_argument('--elevation',
+                        action='store',
+                        dest='elevation_filename',
+                        default=None,
+                        help='optional name of output elevation file (.img); '
+                             'default is {scene_name}_elevation.img',
+                        metavar='FILE',
+                        required=False)
 
     group = parser.add_mutually_exclusive_group(required=True)
 
@@ -1567,7 +1590,7 @@ def main():
     # Look for user-specified min/max extents, which would then override the
     # scene extents
     geo_extents = parser.add_argument_group('geo_extents',
-        'User-specified geographic extents to over-ride the scene extents. '
+        'User-specified geographic extents to override the scene extents. '
         'The scene projection and reflectance band resolution are used. '
         'If one of the following parameters is specified they all must be '
         'specified.')
@@ -1577,28 +1600,32 @@ def main():
                              dest='extent_minx',
                              default=None,
                              metavar='FLOAT',
-                             help='Minimum X direction extent value')
+                             help='Minimum X direction extent value',
+                             required=False)
 
     geo_extents.add_argument('--extent-maxx',
                              action='store',
                              dest='extent_maxx',
                              default=None,
                              metavar='FLOAT',
-                             help='Maximum X direction extent value')
+                             help='Maximum X direction extent value',
+                             required=False)
 
     geo_extents.add_argument('--extent-miny',
                              action='store',
                              dest='extent_miny',
                              default=None,
                              metavar='FLOAT',
-                             help='Minimum Y direction extent value')
+                             help='Minimum Y direction extent value',
+                             required=False)
 
     geo_extents.add_argument('--extent-maxy',
                              action='store',
                              dest='extent_maxy',
                              default=None,
                              metavar='FLOAT',
-                             help='Maximum Y direction extent value')
+                             help='Maximum Y direction extent value',
+                             required=False)
 
     geo_extents.add_argument('--nbound-lat',
                              action='store',
@@ -1606,7 +1633,8 @@ def main():
                              default=None,
                              metavar='FLOAT',
                              help='North-bounding latitude associated with '
-                                  'extent-maxy')
+                                  'extent-maxy',
+                             required=False)
 
     geo_extents.add_argument('--sbound-lat',
                              action='store',
@@ -1614,7 +1642,8 @@ def main():
                              default=None,
                              metavar='FLOAT',
                              help='South-bounding latitude associated with '
-                                  'extent-miny')
+                                  'extent-miny',
+                             required=False)
 
     geo_extents.add_argument('--wbound-lon',
                              action='store',
@@ -1622,7 +1651,8 @@ def main():
                              default=None,
                              metavar='FLOAT',
                              help='West-bounding longitude associated with '
-                                  'extent-minx')
+                                  'extent-minx',
+                             required=False)
 
     geo_extents.add_argument('--ebound-lon',
                              action='store',
@@ -1630,7 +1660,8 @@ def main():
                              default=None,
                              metavar='FLOAT',
                              help='East-bounding longitude associated with '
-                                  'extent-maxx')
+                                  'extent-maxx',
+                             required=False)
 
     args = parser.parse_args()
 
@@ -1665,6 +1696,7 @@ def main():
     sbound_lat = None
     wbound_lon = None
     ebound_lon = None
+    elev_filename = args.elevation_filename
 
     # Grab the user-specified extents if they exist
     user_extents = check_for_extents(args)
@@ -1686,7 +1718,7 @@ def main():
                     'sbound-lat: {5}  '
                     'ebound-lon: {6}  '
                     'wbound-lon: {7}'.format(minx, maxx, miny, maxy, nbound_lat,
-                                             sbound_lat, wbound_lon, ebound_lon))
+                                      sbound_lat, wbound_lon, ebound_lon))
 
     # Call the core processing
     elevation = None
@@ -1694,12 +1726,12 @@ def main():
         logger.info('Processing XML file: {0}'.format(args.xml_filename))
         elevation = XMLElevation(args.xml_filename, user_extents, minx, maxx,
                                  miny, maxy, nbound_lat, sbound_lat, wbound_lon,
-                                 ebound_lon)
+                                 ebound_lon, elev_filename)
     else:
         logger.info('Processing MTL file: {0}'.format(args.mtl_filename))
         elevation = MTLElevation(args.mtl_filename, user_extents, minx, maxx,
                                  miny, maxy, nbound_lat, sbound_lat, wbound_lon,
-                                 ebound_lon)
+                                 ebound_lon, elev_filename)
 
     try:
         elevation.generate()
