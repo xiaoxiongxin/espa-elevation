@@ -27,7 +27,7 @@ from espa import Metadata
 from espa import ENVIHeader
 
 
-SOFTWARE_VERSION = 'ELEVATION_2.0.1'
+SOFTWARE_VERSION = 'ELEVATION_2.1.0'
 
 # Environment variable for the location of the elevation sources
 ESPA_ELEVATION_DIR = 'ESPA_ELEVATION_DIR'
