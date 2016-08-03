@@ -1190,8 +1190,11 @@ class BaseElevation(object):
             self.add_elevation_band_to_xml(elevation_source)
 
 
+# Support Level-1, TOA, and surface reflectance products
 XML_PRODUCT_CODES = ['L1T', 'L1G',
-                     'L1TP', 'L1GT', 'L1GS']
+                     'L1TP', 'L1GT', 'L1GS',
+                     'toa_refl', 'sr_refl']
+XML_BAND_CODES = ['band1', 'toa_band1', 'sr_band1']
 
 
 class XMLElevation(BaseElevation):
@@ -1227,7 +1230,9 @@ class XMLElevation(BaseElevation):
 
         Notes:
           It is expected the input metadata file is an ESPA *.xml file and
-          follows the format of those files.
+          follows the format of those files.  Level-1, TOA reflectance, or
+          surface reflectance products are supported as input.  Band1 from
+          those products will be used.
         """
 
         espa_metadata = Metadata()
@@ -1270,9 +1275,10 @@ class XMLElevation(BaseElevation):
         self.elevation_image_name = (self.elevation_image_name_fmt
                                      .format(product_id))
 
+        band_found = False
         for band in espa_metadata.xml_object.bands.band:
             if (band.attrib['product'] in XML_PRODUCT_CODES and
-                    band.attrib['name'] == 'band1'):
+                    band.attrib['name'] in XML_BAND_CODES):
                 self.target_srs = (
                     Geo.get_proj4_projection_string(str(band.file_name)))
                 self.pixel_resolution_x = float(band.pixel_size.attrib['x'])
@@ -1280,7 +1286,16 @@ class XMLElevation(BaseElevation):
                 self.pixel_units = band.pixel_size.attrib['units']
                 self.number_of_lines = band.attrib['nlines']
                 self.number_of_samples = band.attrib['nsamps']
+                band_found = True
                 break
+
+        # Make sure an appropriate reflectance band was found in the XML file
+        if not band_found:
+            raise RuntimeError('Supported reflectance band not found in XML '
+                               'file: {0}. Level-1 band1, TOA reflectance '
+                               'toa_band1, and SR sr_band1 are the reflectance '
+                               'bands currently supported for elevation '
+                               'generation.'.format(self.xml_filename))
 
         # Adjust the coordinates for image extents from the XML because they
         # are in center of pixel, and we need to supply the warping with actual
