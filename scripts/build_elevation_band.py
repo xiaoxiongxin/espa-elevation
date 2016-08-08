@@ -1193,8 +1193,8 @@ class BaseElevation(object):
 # Support Level-1, TOA, and surface reflectance products
 XML_PRODUCT_CODES = ['L1T', 'L1G',
                      'L1TP', 'L1GT', 'L1GS',
-                     'toa_refl', 'sr_refl']
-XML_BAND_CODES = ['band1', 'toa_band1', 'sr_band1']
+                     'sr_refl']
+XML_BAND_CODES = ['band1', 'sr_band1']
 
 
 class XMLElevation(BaseElevation):
