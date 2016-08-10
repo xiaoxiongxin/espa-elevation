@@ -762,7 +762,8 @@ class BaseElevation(object):
                 abs_lon = abs(lon)
 
                 tile_list.append('{0}{1:03}{2}{3:02}'
-                                 .format(e_w, abs_lon, n_s, abs_lat))
+                                 .format(e_w, int(abs_lon), n_s,
+                                 int(abs_lat)))
 
         return tile_list
 
@@ -849,13 +850,29 @@ class BaseElevation(object):
         logger.debug('End Longitude: {0}'.format(end_longitude))
 
         tile_list = list()
+
+        # Build the list of longitudes to process, taking into account that
+        # there could be a 180 meridian crossing.
+        longitude_list = list()
+        if start_longitude > end_longitude:
+            # The start and end longitudes are on different sides of the
+            # antimeridian.  Note: there are no e180 GLS tiles, only some
+            # w180 tiles, so don't look for e180.
+            for lon in xrange(start_longitude, 179 + 1):
+                longitude_list.append(lon)
+            for lon in xrange(-180, end_longitude + 1):
+                longitude_list.append(lon)
+        else:
+            for lon in xrange(start_longitude, end_longitude + 1):
+                longitude_list.append(lon)
+
         for lat in xrange(end_latitude, start_latitude + 1):
             logger.debug('Latitude: {0}'.format(lat))
             n_s = 'n'
             if lat < 0:
                 n_s = 's'
 
-            for lon in xrange(start_longitude, end_longitude + 1):
+            for lon in longitude_list:
                 logger.debug('Longitude: {0}'.format(lon))
 
                 e_w = 'e'
