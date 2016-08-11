@@ -46,8 +46,8 @@ class Geo(object):
         """Translate image coordinates into map coordinates
 
         Args:
-            image_x <int>: X coordinate value fromn the image
-            image_y <int>: Y coordinate value fromn the image
+            image_x <int>: X coordinate value from the image
+            image_y <int>: Y coordinate value from the image
             transform <2x3:float>: GDAL Affine transformation matrix
                                    [0] - Map X of upper left corner
                                    [1] - Pixel size in X direction
@@ -482,6 +482,44 @@ class BaseElevation(object):
                  source_data=source_name,
                  output_filename=self.elevation_image_name)
 
+    def shift_longitude(self, dem_name, shifted_dem_name, offset):
+        """Shift the longitude of the DEM data"""
+
+        logger = logging.getLogger(__name__)
+
+        # Set up the base command
+        cmd = ['gdal_translate', '-a_ullr']
+
+        # Get the current locations 
+        dem_src = gdal.Open(dem_name)
+        ulx, xres, xskew, uly, yskew, yres = dem_src.GetGeoTransform()
+
+        # Compute the adjusted longitude locations
+        lrx = ulx + (dem_src.RasterXSize * xres)
+        lry = uly + (dem_src.RasterYSize * yres)
+        new_ulx = ulx + offset
+        new_lrx = lrx + offset
+
+        # Close the dataset
+        dem_src = None
+
+        # Add updated coordinates to the command
+        cmd.extend([str(new_ulx), str(uly), str(new_lrx), str(lry)])
+
+        # Add source and destination files to the command
+        cmd.extend([dem_name, shifted_dem_name])
+
+        # Convert to a string for the execution
+        cmd = ' '.join(cmd)
+
+        output = ''
+        try:
+            logger.info('EXECUTING TRANSLATE COMMAND [{0}]'.format(cmd))
+            output = execute_cmd(cmd)
+        finally:
+            if len(output) > 0:
+                logger.info(output)
+
     def _verify_ramp_overlap(self,
                              ramp_lines,
                              ramp_samples,
@@ -812,8 +850,33 @@ class BaseElevation(object):
 
         logger = logging.getLogger(__name__)
 
-        # Retireve the GTOPO30 tiles
+        # Retrieve the GTOPO30 tiles
         tile_elevation_list = self.get_gtopo30_dems()
+
+        # If the image crosses the 180 meridian, shift the west tile
+        # longitudes to use the 0..360 range so the mosaic is not confused
+        start_longitude = int(math.floor(self.bounding_west_longitude))
+        end_longitude = int(math.floor(self.bounding_east_longitude))
+        if start_longitude > end_longitude:
+
+            for tile in tile_elevation_list:
+                hemisphere = tile[:1]
+                if hemisphere == "W":
+
+                    # Name the shifted output file
+                    shifted_tile = tile + '_shifted'
+
+                    # Shift the longitude values
+                    self.shift_longitude(tile, shifted_tile, 360)
+
+                    # Copy destination file back to source file
+                    output = ''
+                    try:
+                        cmd = 'cp {0} {1}'.format(shifted_tile, tile)
+                        output = execute_cmd(cmd)
+                    finally:
+                        if len(output) > 0:
+                            logger.info(output)
 
         # MOSAIC the tiles together
         self.mosaic_tiles(tile_elevation_list)
@@ -943,6 +1006,33 @@ class BaseElevation(object):
             raise GLSOverWaterError('GLS DEM is over water')
 
         logger.info('GLS DEM Files: {0}'.format(', '.join(bil_list)))
+
+        # If the image crosses the 180 meridian, shift the west tile
+        # longitudes to use the 0..360 range so the mosaic is not confused
+        if start_longitude > end_longitude:
+
+            for tile in bil_list:
+                hemisphere = tile[3:4]
+                if hemisphere == "w":
+
+                    # Name the shifted output file
+                    shifted_tile = tile + '_shifted'
+
+                    # Shift the longitude values
+                    self.shift_longitude(tile, shifted_tile, 360)
+
+                    # Remove symbolic link to original DEM data since we 
+                    # want to replace it with updated data. 
+                    os.unlink(tile)
+
+                    # Move destination file back to source file
+                    output = ''
+                    try:
+                        cmd = 'mv {0} {1}'.format(shifted_tile, tile)
+                        output = execute_cmd(cmd)
+                    finally:
+                        if len(output) > 0:
+                            logger.info(output)
 
         # MOSAIC the tiles together
         self.mosaic_tiles(bil_list)
