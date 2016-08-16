@@ -731,10 +731,18 @@ class BaseElevation(object):
         Note: this does not seem to cause problems on the North and South
         borders, so we will no worry about them.
         '''
-        ul_lon = Math.longitude_norm(self.bounding_west_longitude -
-                                     self.gtopo30_padding)
-        lr_lon = Math.longitude_norm(self.bounding_east_longitude +
-                                     self.gtopo30_padding)
+        if (self.bounding_west_longitude < -90 and 
+            self.bounding_east_longitude > 90):
+            # 180 meridian crossing
+            ul_lon = Math.longitude_norm(self.bounding_west_longitude +
+                                         self.gtopo30_padding)
+            lr_lon = Math.longitude_norm(self.bounding_east_longitude -
+                                         self.gtopo30_padding)
+        else:
+            ul_lon = Math.longitude_norm(self.bounding_west_longitude -
+                                         self.gtopo30_padding)
+            lr_lon = Math.longitude_norm(self.bounding_east_longitude +
+                                         self.gtopo30_padding)
         logger.debug('ul_lon = {0}'.format(ul_lon))
         logger.debug('lr_lon = {0}'.format(lr_lon))
 
@@ -857,7 +865,8 @@ class BaseElevation(object):
         # longitudes to use the 0..360 range so the mosaic is not confused
         start_longitude = int(math.floor(self.bounding_west_longitude))
         end_longitude = int(math.floor(self.bounding_east_longitude))
-        if start_longitude > end_longitude:
+
+        if start_longitude < -90 and end_longitude > 90:
 
             for tile in tile_elevation_list:
                 hemisphere = tile[:1]
@@ -917,13 +926,13 @@ class BaseElevation(object):
         # Build the list of longitudes to process, taking into account that
         # there could be a 180 meridian crossing.
         longitude_list = list()
-        if start_longitude > end_longitude:
+        if start_longitude < -90 and end_longitude > 90:
             # The start and end longitudes are on different sides of the
             # antimeridian.  Note: there are no e180 GLS tiles, only some
             # w180 tiles, so don't look for e180.
-            for lon in xrange(start_longitude, 179 + 1):
+            for lon in xrange(-180, start_longitude + 1):
                 longitude_list.append(lon)
-            for lon in xrange(-180, end_longitude + 1):
+            for lon in xrange(end_longitude, 179 + 1):
                 longitude_list.append(lon)
         else:
             for lon in xrange(start_longitude, end_longitude + 1):
@@ -1009,7 +1018,7 @@ class BaseElevation(object):
 
         # If the image crosses the 180 meridian, shift the west tile
         # longitudes to use the 0..360 range so the mosaic is not confused
-        if start_longitude > end_longitude:
+        if start_longitude < -90 and end_longitude > 90:
 
             for tile in bil_list:
                 hemisphere = tile[3:4]
@@ -1227,8 +1236,15 @@ class BaseElevation(object):
         # Pad the max box coordinate values
         self.bounding_north_latitude += self.maxbox_padding
         self.bounding_south_latitude -= self.maxbox_padding
-        self.bounding_east_longitude += self.maxbox_padding
-        self.bounding_west_longitude -= self.maxbox_padding
+
+        if (self.bounding_west_longitude < -90 and 
+            self.bounding_east_longitude > 90):
+            # 180 meridian crossing
+            self.bounding_east_longitude -= self.maxbox_padding
+            self.bounding_west_longitude += self.maxbox_padding
+        else:
+            self.bounding_east_longitude += self.maxbox_padding
+            self.bounding_west_longitude -= self.maxbox_padding
 
         elevation_source = 'gtopo30'
         # Retrieve the tiles, mosaic, and warp to the source data
