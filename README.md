@@ -9,6 +9,7 @@ This project contains application source code for extracting elevation data from
 ## Release Notes
 * Supported optional user-defined geographic extents
 * Supported optional user-defined output filename
+* Fixed a problem warping elevation data for scenes crossing the 180th meridian
 
 ## Installation
 
