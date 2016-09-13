@@ -399,7 +399,6 @@ class BaseElevation(object):
             self.elevation_image_name_fmt = '{0}_elevation.img'
             self.elevation_header_name_fmt = '{0}_elevation.hdr'
         else:
-            print('DEBUG: elevation filename: {0}'.format(elevation_filename))
             self.elevation_image_name_fmt = elevation_filename
             self.elevation_header_name_fmt = elevation_filename.  \
                                             replace('.img', '.hdr')
