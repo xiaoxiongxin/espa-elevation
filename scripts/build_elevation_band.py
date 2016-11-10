@@ -27,7 +27,7 @@ from espa import Metadata
 from espa import ENVIHeader
 
 
-SOFTWARE_VERSION = 'ELEVATION_2.1.0'
+SOFTWARE_VERSION = 'ELEVATION_2.2.0'
 
 # Environment variable for the location of the elevation sources
 ESPA_ELEVATION_DIR = 'ESPA_ELEVATION_DIR'
@@ -1302,7 +1302,7 @@ class BaseElevation(object):
 XML_PRODUCT_CODES = ['L1T', 'L1G',
                      'L1TP', 'L1GT', 'L1GS',
                      'sr_refl']
-XML_BAND_CODES = ['band1', 'sr_band1']
+XML_BAND_CODES = ['b1', 'sr_band1']
 
 
 class XMLElevation(BaseElevation):
@@ -1339,7 +1339,7 @@ class XMLElevation(BaseElevation):
         Notes:
           It is expected the input metadata file is an ESPA *.xml file and
           follows the format of those files.  Level-1, TOA reflectance, or
-          surface reflectance products are supported as input.  Band1 from
+          surface reflectance products are supported as input.  Band 1 from
           those products will be used.
         """
 
@@ -1400,7 +1400,7 @@ class XMLElevation(BaseElevation):
         # Make sure an appropriate reflectance band was found in the XML file
         if not band_found:
             raise RuntimeError('Supported reflectance band not found in XML '
-                               'file: {0}. Level-1 band1, TOA reflectance '
+                               'file: {0}. Level-1 b1, TOA reflectance '
                                'toa_band1, and SR sr_band1 are the reflectance '
                                'bands currently supported for elevation '
                                'generation.'.format(self.xml_filename))
