@@ -1,15 +1,13 @@
-## ESPA Elevation Generation Version 2.1.0 - Release Notes
+## ESPA Elevation Generation Version 2.2.0 - Release Notes
 
-Release Date: October 2016
+Release Date: December 2016
 
-See git tag [v2.1.0]
+See git tag [v2.2.0]
 
 This project contains application source code for extracting elevation data from external sources and generating an elevation product conforming to the input data. An option exists to specify a user-defined geographic extents (versus the default scene extents) to produce elevation for a different footprint from the scene.
 
 ## Release Notes
-* Supported optional user-defined geographic extents
-* Supported optional user-defined output filename
-* Fixed a problem warping elevation data for scenes crossing the 180th meridian
+* Supported new ESPA Level-1 band names
 
 ## Installation
 
