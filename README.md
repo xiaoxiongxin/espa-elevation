@@ -1,6 +1,6 @@
 ## ESPA Elevation Generation Version 2.2.0 - Release Notes
 
-Release Date: December 2016
+Release Date: January 2017
 
 See git tag [v2.2.0]
 
