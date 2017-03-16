@@ -3,7 +3,7 @@
 #
 # Project Name: product formatter
 #-----------------------------------------------------------------------------
-.PHONY: check-environment all install clean all-script install-script clean-script rpms
+.PHONY: check-environment all install clean all-script install-script clean-script
 
 include make.config
 
@@ -25,10 +25,6 @@ install-script:
 clean-script:
 	echo "make clean in scripts"; \
         (cd scripts; $(MAKE) clean);
-
-#-----------------------------------------------------------------------------
-rpms:
-	rpmbuild -bb --clean RPM_spec_files/RPM.spec
 
 #-----------------------------------------------------------------------------
 check-environment:
