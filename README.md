@@ -1,19 +1,18 @@
-## ESPA Elevation Generation Version 2.2.0 - Release Notes
+## ESPA Elevation Generation Version 2.3.0 - Release Notes
 
-Release Date: January 2017
-
-See git tag [v2.2.0]
+See git tag [v2.3.0]
 
 This project contains application source code for extracting elevation data from external sources and generating an elevation product conforming to the input data. An option exists to specify a user-defined geographic extents (versus the default scene extents) to produce elevation for a different footprint from the scene.
 
 ## Release Notes
-* Supported new ESPA Level-1 band names
+* Version changes
+* Added support for ARD Metadata
 
 ## Installation
 
 ### Dependencies
 * Python 2.7.X and Numpy/GDAL
-* [espa-python-library](https://github.com/USGS-EROS/espa-python-library) >= 1.0.1
+* [espa-python-library](https://github.com/USGS-EROS/espa-python-library) >= 1.1.0
 * [GDAL](http://www.gdal.org/) 1.11.1
   - The command line tools are utilized for some of the processing steps.
 
