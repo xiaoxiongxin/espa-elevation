@@ -27,7 +27,7 @@ from espa import Metadata
 from espa import ENVIHeader
 
 
-SOFTWARE_VERSION = 'ELEVATION_2.2.0'
+SOFTWARE_VERSION = 'ELEVATION_2.3.0'
 
 # Environment variable for the location of the elevation sources
 ESPA_ELEVATION_DIR = 'ESPA_ELEVATION_DIR'
@@ -1129,8 +1129,8 @@ class BaseElevation(object):
     def add_elevation_band_to_xml(self, elevation_source):
         """Adds the elevation band to the ESPA Metadata XML file"""
 
-        espa_metadata = Metadata()
-        espa_metadata.parse(xml_filename=self.xml_filename)
+        metadata = Metadata()
+        metadata.parse(xml_filename=self.xml_filename)
 
         # Create an element maker
         em = objectify.ElementMaker(annotate=False,
@@ -1178,16 +1178,16 @@ class BaseElevation(object):
         band.production_date = em.element(date_now)
 
         # Append the band to the XML
-        espa_metadata.xml_object.bands.append(band)
+        metadata.xml_object.bands.append(band)
 
         # Validate the XML
-        espa_metadata.validate()
+        metadata.validate()
 
         # Write it to the XML file
-        espa_metadata.write(xml_filename=self.xml_filename)
+        metadata.write(xml_filename=self.xml_filename)
 
         # Memory cleanup
-        del espa_metadata
+        del metadata
 
     def generate(self):
         """Generates the elevation"""
@@ -1299,10 +1299,14 @@ class BaseElevation(object):
 
 
 # Support Level-1, TOA, and surface reflectance products
-XML_PRODUCT_CODES = ['L1T', 'L1G',
-                     'L1TP', 'L1GT', 'L1GS',
-                     'sr_refl']
-XML_BAND_CODES = ['b1', 'sr_band1']
+ARD_MODE = 'ARD'
+ESPA_MODE = 'ESPA'
+
+XML_BAND_PRODUCT_CODES = {ARD_MODE: ['sr_refl'],
+                          ESPA_MODE: ['L1T', 'L1G', 'L1TP',
+                                 'L1GT', 'L1GS', 'sr_refl']}
+XML_BAND_NAME_CODES = {ARD_MODE: ['SRB1'],
+                       ESPA_MODE: ['b1', 'sr_band1']}
 
 
 class XMLElevation(BaseElevation):
@@ -1343,26 +1347,31 @@ class XMLElevation(BaseElevation):
           those products will be used.
         """
 
-        espa_metadata = Metadata()
-        espa_metadata.parse(xml_filename=self.xml_filename)
+        metadata = Metadata(xml_filename=self.xml_filename)
+        metadata.parse(xml_filename=self.xml_filename)
+
+        mode = ESPA_MODE
+
+        if str(metadata.xml_object.tag).endswith('espa_metadata'):
+            global_metadata = metadata.xml_object.global_metadata
+        elif str(metadata.xml_object.tag).endswith('ard_metadata'):
+            global_metadata = metadata.xml_object.tile_metadata.global_metadata
+            mode = ARD_MODE
+        else:
+            raise RuntimeError('Un-Supported Metadata XML')
 
         # Read the scene extents if they weren't specified by the user
         if not self.user_extents:
-            self.bounding_north_latitude = float(espa_metadata.xml_object
-                                                 .global_metadata
+            self.bounding_north_latitude = float(global_metadata
                                                  .bounding_coordinates.north)
-            self.bounding_south_latitude = float(espa_metadata.xml_object
-                                                 .global_metadata
+            self.bounding_south_latitude = float(global_metadata
                                                  .bounding_coordinates.south)
-            self.bounding_east_longitude = float(espa_metadata.xml_object
-                                                 .global_metadata
+            self.bounding_east_longitude = float(global_metadata
                                                  .bounding_coordinates.east)
-            self.bounding_west_longitude = float(espa_metadata.xml_object
-                                                 .global_metadata
+            self.bounding_west_longitude = float(global_metadata
                                                  .bounding_coordinates.west)
 
-            for corner_point in (espa_metadata.xml_object
-                                 .global_metadata
+            for corner_point in (global_metadata
                                  .projection_information.corner_point):
                 if corner_point.attrib['location'] == 'UL':
                     self.min_x_extent = float(corner_point.attrib['x'])
@@ -1373,20 +1382,28 @@ class XMLElevation(BaseElevation):
 
         # Read the rest of the scene metadata
         product_id = None
-        try:
-            product_id = espa_metadata.xml_object.global_metadata.product_id
-        except:
-            product_id = espa_metadata.xml_object.global_metadata.scene_id
+        for element in global_metadata.getchildren():
+            if 'product_id' in element.tag:
+                product_id = element.text
+            elif 'scene_id' in element.tag:
+                product_id = element.text
+        if product_id is None:
+            raise RuntimeError('Un-Supported Metadata XML')
 
         self.elevation_header_name = (self.elevation_header_name_fmt
                                       .format(product_id))
         self.elevation_image_name = (self.elevation_image_name_fmt
                                      .format(product_id))
 
+        if str(metadata.xml_object.tag).endswith('espa_metadata'):
+            bands = metadata.xml_object.bands.band
+        elif str(metadata.xml_object.tag).endswith('ard_metadata'):
+            bands = metadata.xml_object.tile_metadata.bands.band
+
         band_found = False
-        for band in espa_metadata.xml_object.bands.band:
-            if (band.attrib['product'] in XML_PRODUCT_CODES and
-                    band.attrib['name'] in XML_BAND_CODES):
+        for band in bands:
+            if (band.attrib['product'] in XML_BAND_PRODUCT_CODES[mode] and
+                    band.attrib['name'] in XML_BAND_NAME_CODES[mode]):
                 self.target_srs = (
                     Geo.get_proj4_projection_string(str(band.file_name)))
                 self.pixel_resolution_x = float(band.pixel_size.attrib['x'])
@@ -1400,10 +1417,7 @@ class XMLElevation(BaseElevation):
         # Make sure an appropriate reflectance band was found in the XML file
         if not band_found:
             raise RuntimeError('Supported reflectance band not found in XML '
-                               'file: {0}. Level-1 b1, TOA reflectance '
-                               'toa_band1, and SR sr_band1 are the reflectance '
-                               'bands currently supported for elevation '
-                               'generation.'.format(self.xml_filename))
+                               'file: {0}')
 
         # Adjust the coordinates for image extents from the XML because they
         # are in center of pixel, and we need to supply the warping with actual
@@ -1428,7 +1442,7 @@ class XMLElevation(BaseElevation):
                 (self.max_y_extent - self.min_y_extent) /
                  self.pixel_resolution_y))
 
-        del espa_metadata
+        del metadata
 
 
 class MTLElevation(BaseElevation):
