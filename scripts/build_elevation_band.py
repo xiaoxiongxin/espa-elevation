@@ -1126,6 +1126,11 @@ class BaseElevation(object):
         os.unlink(geoid_header_name)
         os.unlink(geoid_image_name)
 
+    def append_band(self, metadata, band):
+        """Implement this to add the band object to the metadata object"""
+        raise NotImplementedError('Please Implement Me In {0}'
+                                  .format(str(type(self))))
+
     def add_elevation_band_to_xml(self, elevation_source):
         """Adds the elevation band to the ESPA Metadata XML file"""
 
@@ -1178,7 +1183,7 @@ class BaseElevation(object):
         band.production_date = em.element(date_now)
 
         # Append the band to the XML
-        metadata.xml_object.bands.append(band)
+        self.append_band(metadata, band)
 
         # Validate the XML
         metadata.validate()
@@ -1298,17 +1303,6 @@ class BaseElevation(object):
             self.add_elevation_band_to_xml(elevation_source)
 
 
-# Support Level-1, TOA, and surface reflectance products
-ARD_MODE = 'ARD'
-ESPA_MODE = 'ESPA'
-
-XML_BAND_PRODUCT_CODES = {ARD_MODE: ['sr_refl'],
-                          ESPA_MODE: ['L1T', 'L1G', 'L1TP',
-                                 'L1GT', 'L1GS', 'sr_refl']}
-XML_BAND_NAME_CODES = {ARD_MODE: ['SRB1'],
-                       ESPA_MODE: ['b1', 'sr_band1']}
-
-
 class XMLElevation(BaseElevation):
     """Defines the class object for XML based elevation generation
 
@@ -1317,8 +1311,9 @@ class XMLElevation(BaseElevation):
        the scene projection and resolution will be used.
     """
 
-    def __init__(self, xml_filename, user_extents, minx, maxx, miny, maxy,
-                 nbound_lat, sbound_lat, wbound_lon, ebound_lon, elev_filename):
+    def __init__(self, xml_filename, user_extents, minx, maxx, miny,
+                 maxy, nbound_lat, sbound_lat, wbound_lon, ebound_lon,
+                 elev_filename):
         """Class initialization"""
         super(XMLElevation, self).__init__(elev_filename)
 
@@ -1350,15 +1345,7 @@ class XMLElevation(BaseElevation):
         metadata = Metadata(xml_filename=self.xml_filename)
         metadata.parse(xml_filename=self.xml_filename)
 
-        mode = ESPA_MODE
-
-        if str(metadata.xml_object.tag).endswith('espa_metadata'):
-            global_metadata = metadata.xml_object.global_metadata
-        elif str(metadata.xml_object.tag).endswith('ard_metadata'):
-            global_metadata = metadata.xml_object.tile_metadata.global_metadata
-            mode = ARD_MODE
-        else:
-            raise RuntimeError('Un-Supported Metadata XML')
+        global_metadata = self.get_global_metadata(metadata)
 
         # Read the scene extents if they weren't specified by the user
         if not self.user_extents:
@@ -1400,24 +1387,17 @@ class XMLElevation(BaseElevation):
         elif str(metadata.xml_object.tag).endswith('ard_metadata'):
             bands = metadata.xml_object.tile_metadata.bands.band
 
-        band_found = False
-        for band in bands:
-            if (band.attrib['product'] in XML_BAND_PRODUCT_CODES[mode] and
-                    band.attrib['name'] in XML_BAND_NAME_CODES[mode]):
-                self.target_srs = (
-                    Geo.get_proj4_projection_string(str(band.file_name)))
-                self.pixel_resolution_x = float(band.pixel_size.attrib['x'])
-                self.pixel_resolution_y = float(band.pixel_size.attrib['y'])
-                self.pixel_units = band.pixel_size.attrib['units']
-                self.number_of_lines = band.attrib['nlines']
-                self.number_of_samples = band.attrib['nsamps']
-                band_found = True
-                break
+        ref_band = self.get_reference_band(bands)
+        # Make sure an appropriate band was found in the XML file
+        if ref_band is None:
+            raise RuntimeError('Supported bands not found in XML file')
 
-        # Make sure an appropriate reflectance band was found in the XML file
-        if not band_found:
-            raise RuntimeError('Supported reflectance band not found in XML '
-                               'file: {0}')
+        self.target_srs = Geo.get_proj4_projection_string(str(ref_band.file_name))
+        self.pixel_resolution_x = float(ref_band.pixel_size.attrib['x'])
+        self.pixel_resolution_y = float(ref_band.pixel_size.attrib['y'])
+        self.pixel_units = ref_band.pixel_size.attrib['units']
+        self.number_of_lines = ref_band.attrib['nlines']
+        self.number_of_samples = ref_band.attrib['nsamps']
 
         # Adjust the coordinates for image extents from the XML because they
         # are in center of pixel, and we need to supply the warping with actual
@@ -1445,6 +1425,95 @@ class XMLElevation(BaseElevation):
         del metadata
 
 
+ESPA_PRODUCT_NAMES = ['L1T', 'L1G', 'L1TP', 'L1GT', 'L1GS', 'sr_refl']
+ESPA_BAND_NAMES = ['b1', 'sr_band1']
+
+
+class ESPAXMLElevation(XMLElevation):
+
+    def __init__(self, xml_filename, user_extents, minx, maxx, miny,
+                 maxy, nbound_lat, sbound_lat, wbound_lon, ebound_lon,
+                 elev_filename):
+        """Class initialization"""
+        super(ESPAXMLElevation, self).__init__(xml_filename, user_extents,
+                                               minx, maxx, miny, maxy,
+                                               nbound_lat, sbound_lat,
+                                               wbound_lon, ebound_lon,
+                                               elev_filename)
+
+    def get_global_metadata(self, metadata):
+        """Retrieves the global metadata for ESPA
+        """
+
+        return metadata.xml_object.global_metadata
+
+    def append_band(self, metadata, band):
+        """Appends the band to the correct location for ESPA
+        """
+
+        metadata.xml_object.bands.append(band)
+
+    def get_reference_band(self, bands):
+        """Determines the correct reference band for ESPA
+        """
+
+        reference_band = None
+
+        for band in bands:
+            if (band.attrib['name'] in ESPA_BAND_NAMES and
+                    band.attrib['product'] in ESPA_PRODUCT_NAMES):
+                if os.path.isfile(str(band.file_name)):
+                    reference_band = band
+                    break
+
+        return reference_band
+
+
+# The PIXELQA band is present in all ARD Tile products
+ARD_PRODUCT_NAMES = ['level2_qa']
+ARD_BAND_NAMES = ['PIXELQA']
+
+
+class ARDXMLElevation(XMLElevation):
+
+    def __init__(self, xml_filename, user_extents, minx, maxx, miny,
+                 maxy, nbound_lat, sbound_lat, wbound_lon, ebound_lon,
+                 elev_filename):
+        """Class initialization"""
+        super(ARDXMLElevation, self).__init__(xml_filename, user_extents,
+                                              minx, maxx, miny, maxy,
+                                              nbound_lat, sbound_lat,
+                                              wbound_lon, ebound_lon,
+                                              elev_filename)
+
+    def get_global_metadata(self, metadata):
+        """Retrieves the global metadata for ARD
+        """
+
+        return metadata.xml_object.tile_metadata.global_metadata
+
+    def append_band(self, metadata, band):
+        """Appends the band to the correct location for ARD
+        """
+
+        metadata.xml_object.tile_metadata.bands.append(band)
+
+    def get_reference_band(self, bands):
+        """Determines the correct reference band for ARD
+        """
+
+        reference_band = None
+
+        for band in bands:
+            if (band.attrib['name'] in ARD_BAND_NAMES and
+                    band.attrib['product'] in ARD_PRODUCT_NAMES):
+                if os.path.isfile(str(band.file_name)):
+                    reference_band = band
+                    break
+
+        return reference_band
+
+
 class MTLElevation(BaseElevation):
     """Defines the class object for MTL based elevation generation
 
@@ -1453,8 +1522,9 @@ class MTLElevation(BaseElevation):
        the scene projection and resolution will be used.
     """
 
-    def __init__(self, mtl_filename, user_extents, minx, maxx, miny, maxy,
-                 nbound_lat, sbound_lat, wbound_lon, ebound_lon, elev_filename):
+    def __init__(self, mtl_filename, user_extents, minx, maxx, miny,
+                 maxy, nbound_lat, sbound_lat, wbound_lon, ebound_lon,
+                 elev_filename):
         """Class initialization"""
         super(MTLElevation, self).__init__(elev_filename)
 
@@ -1469,7 +1539,6 @@ class MTLElevation(BaseElevation):
             self.bounding_south_latitude = sbound_lat
             self.bounding_west_longitude = wbound_lon
             self.bounding_east_longitude = ebound_lon
-
 
     def parse_metadata(self):
         """Parse the input metadata file
@@ -1721,7 +1790,7 @@ def main():
                        action='store',
                        dest='xml_filename',
                        default=None,
-                       help='name of ESPA XML Metadata file',
+                       help='name of XML Metadata file',
                        metavar='FILE')
 
     # Look for user-specified min/max extents, which would then override the
@@ -1861,11 +1930,30 @@ def main():
     elevation = None
     if args.xml_filename is not None:
         logger.info('Processing XML file: {0}'.format(args.xml_filename))
-        elevation = XMLElevation(args.xml_filename, user_extents, minx, maxx,
-                                 miny, maxy, nbound_lat, sbound_lat, wbound_lon,
-                                 ebound_lon, elev_filename)
+
+        metadata = Metadata(xml_filename=args.xml_filename)
+        is_espa = False
+        if str(metadata.xml_object.tag).endswith('espa_metadata'):
+            is_espa = True
+        elif str(metadata.xml_object.tag).endswith('ard_metadata'):
+            is_espa = False
+        else:
+            raise RuntimeError('Un-Supported Metadata XML')
+        del metadata
+
+        if is_espa:
+            elevation = ESPAXMLElevation(args.xml_filename, user_extents,
+                                         minx, maxx, miny, maxy,
+                                         nbound_lat, sbound_lat, wbound_lon,
+                                         ebound_lon, elev_filename)
+        else:
+            elevation = ARDXMLElevation(args.xml_filename, user_extents,
+                                        minx, maxx, miny, maxy,
+                                        nbound_lat, sbound_lat, wbound_lon,
+                                        ebound_lon, elev_filename)
     else:
         logger.info('Processing MTL file: {0}'.format(args.mtl_filename))
+
         elevation = MTLElevation(args.mtl_filename, user_extents, minx, maxx,
                                  miny, maxy, nbound_lat, sbound_lat, wbound_lon,
                                  ebound_lon, elev_filename)
