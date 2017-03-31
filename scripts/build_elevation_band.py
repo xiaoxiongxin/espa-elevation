@@ -243,10 +243,10 @@ class Math(object):
         # Test each segment
         for index in xrange(count - 1):
             if (((x_v[index] > x_c) != (x_v[index + 1] > x_c)) and
-                (y_c < ((y_v[index + 1] - y_v[index]) *
-                        (x_c - x_v[index]) /
-                        (x_v[index + 1] - x_v[index]) +
-                        y_v[index]))):
+                    (y_c < ((y_v[index + 1] - y_v[index]) *
+                            (x_c - x_v[index]) /
+                            (x_v[index + 1] - x_v[index]) +
+                            y_v[index]))):
 
                 inside_polygon = not inside_polygon
 
@@ -332,6 +332,11 @@ class BaseElevation(object):
                              filename is used
         """
         super(BaseElevation, self).__init__()
+
+        self.xml_filename = None
+        self.number_of_lines = None
+        self.number_of_samples = None
+        self.pixel_units = None
 
         # Grab what we need from the environment first
         if ESPA_ELEVATION_DIR not in os.environ:
@@ -440,8 +445,6 @@ class BaseElevation(object):
     def mosaic_tiles(self, tiles):
         """MOSAIC the specified tiles into one file"""
 
-        logger = logging.getLogger(__name__)
-
         '''
         Set the no data value to 0 so we fill-in with sea-level,
         because missing tiles in GLS will be water(ocean)
@@ -463,8 +466,6 @@ class BaseElevation(object):
 
     def warp_to_source_data(self, source_name):
         """Warp to the source data"""
-
-        logger = logging.getLogger(__name__)
 
         image_extents = {'min_x': self.min_x_extent,
                          'min_y': self.min_y_extent,
@@ -489,7 +490,7 @@ class BaseElevation(object):
         # Set up the base command
         cmd = ['gdal_translate', '-a_ullr']
 
-        # Get the current locations 
+        # Get the current locations
         dem_src = gdal.Open(dem_name)
         ulx, xres, xskew, uly, yskew, yres = dem_src.GetGeoTransform()
 
@@ -757,10 +758,8 @@ class BaseElevation(object):
         logger.debug('lr_lat = {0}'.format(lr_lat))
 
         # Determine the unique latitudes where the input data resides
-        lat_list = list(set([min(LAT_LOCATIONS[
-                                 np.where(ul_lat < LAT_LOCATIONS)]),
-                             min(LAT_LOCATIONS[
-                                 np.where(lr_lat < LAT_LOCATIONS)])]))
+        lat_list = list(set([min(LAT_LOCATIONS[np.where(ul_lat < LAT_LOCATIONS)]),
+                             min(LAT_LOCATIONS[np.where(lr_lat < LAT_LOCATIONS)])]))
         logger.debug('lat_list = {0}'.format(lat_list))
 
         tile_list = list()
@@ -799,8 +798,7 @@ class BaseElevation(object):
                 abs_lon = abs(lon)
 
                 tile_list.append('{0}{1:03}{2}{3:02}'
-                                 .format(e_w, int(abs_lon), n_s,
-                                 int(abs_lat)))
+                                 .format(e_w, int(abs_lon), n_s, int(abs_lat)))
 
         return tile_list
 
@@ -1021,8 +1019,8 @@ class BaseElevation(object):
                     # Shift the longitude values
                     self.shift_longitude(tile, shifted_tile, 360)
 
-                    # Remove symbolic link to original DEM data since we 
-                    # want to replace it with updated data. 
+                    # Remove symbolic link to original DEM data since we
+                    # want to replace it with updated data
                     os.unlink(tile)
 
                     # Move destination file back to source file
@@ -1052,8 +1050,6 @@ class BaseElevation(object):
 
     def adjust_elevation_to_wgs84(self):
         """Adjusts the warped elevation to the WGS84 GEOID"""
-
-        logger = logging.getLogger(__name__)
 
         geoid_header_name = 'espa-geoid.hdr'
         geoid_image_name = 'espa-geoid.img'
@@ -1415,12 +1411,8 @@ class XMLElevation(BaseElevation):
         # Determine the number of lines and samples for the user-specified
         # extents, based on the pixel size
         if not self.user_extents:
-            self.number_of_samples = int(round(
-                (self.max_x_extent - self.min_x_extent) /
-                 self.pixel_resolution_x))
-            self.number_of_lines = int(round(
-                (self.max_y_extent - self.min_y_extent) /
-                 self.pixel_resolution_y))
+            self.number_of_samples = int(round((self.max_x_extent - self.min_x_extent) / self.pixel_resolution_x))
+            self.number_of_lines = int(round((self.max_y_extent - self.min_y_extent) / self.pixel_resolution_y))
 
         del metadata
 
@@ -1710,9 +1702,9 @@ def check_for_extents(args):
     """
 
     if (args.extent_minx is not None or args.extent_maxx is not None or
-        args.extent_miny is not None or args.extent_maxy is not None or
-        args.nbound_lat is not None or args.sbound_lat is not None or
-        args.wbound_lon is not None or args.ebound_lon is not None):
+            args.extent_miny is not None or args.extent_maxy is not None or
+            args.nbound_lat is not None or args.sbound_lat is not None or
+            args.wbound_lon is not None or args.ebound_lon is not None):
 
         # One of the user-specified extents was specified, so make sure all
         # were specified
@@ -1924,7 +1916,7 @@ def main():
                     'sbound-lat: {5}  '
                     'ebound-lon: {6}  '
                     'wbound-lon: {7}'.format(minx, maxx, miny, maxy, nbound_lat,
-                                      sbound_lat, wbound_lon, ebound_lon))
+                                             sbound_lat, wbound_lon, ebound_lon))
 
     # Call the core processing
     elevation = None
@@ -1960,7 +1952,7 @@ def main():
 
     try:
         elevation.generate()
-    except:
+    except Exception:
         logger.exception('Elevation generation failed')
         sys.exit(1)  # EXIT_FAILURE
 
