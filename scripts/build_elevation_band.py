@@ -1130,8 +1130,7 @@ class BaseElevation(object):
     def add_elevation_band_to_xml(self, elevation_source):
         """Adds the elevation band to the ESPA Metadata XML file"""
 
-        metadata = Metadata()
-        metadata.parse(xml_filename=self.xml_filename)
+        metadata = Metadata(xml_filename=self.xml_filename)
 
         # Create an element maker
         em = objectify.ElementMaker(annotate=False,
