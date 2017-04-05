@@ -35,16 +35,21 @@ make install
 See `build_elevation_band.py --help` for command line details.
 
 ### Data Processing Requirements
-This version of the Elevation Generation application requires the input products to be in the ESPA internal file format.
+This version of the Elevation Generation application requires the input XML Metadata to be in either the ESPA Metadata or ARD Metadata formats.
 
 The following input data are required to generate the elevation product:
-* Level 1 Source Data
-  - The reflectance band 1 information present in the XML metadata file to allow for determining source elevation and extent information so that the generated elevation product matches the input data.
-* External Elevation
+- For ESPA Metadata
+  - Level 1 Source Data
+    - The reflectance band 1 information present in the XML metadata file as well as on disk to allow for determining source elevation and extent information so that the generated elevation product matches the input data.
+- For ARD Metadata
+  - Level 2 Source Data
+    - The pixel QA band information present in the XML metadata file as well as on disk to allow for determining source elevation and extent information so that the generated elevation product matches the input data.
+- External Elevation
   - The external elevation data is expected to be available and in the proper formats to allow for extraction, mosaicing, and final elevation product generation.
 
 ### Data Postprocessing
 After compiling the [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter) libraries and tools, the `convert_espa_to_gtif` and `convert_espa_to_hdf` command-line tools can be used to convert the ESPA internal file format to HDF or GeoTIFF.  Otherwise the data will remain in the ESPA internal file format, which includes each band in the ENVI file format (i.e. raw binary file with associated ENVI header file) and an overall XML metadata file.
+No tools exist for manipulating the resulting ARD products.
 
 ## More Information
 This project is provided by the US Geological Survey (USGS) Earth Resources Observation and Science (EROS) Land Satellite Data Systems (LSDS) Science Research and Development (LSRD) Project. For questions regarding products produced by this source code, please contact the Landsat Contact Us page and specify USGS CDR/ECV in the "Regarding" section. https://landsat.usgs.gov/contactus.php
