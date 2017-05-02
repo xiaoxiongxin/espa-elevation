@@ -1929,7 +1929,8 @@ def main():
         elif str(metadata.xml_object.tag).endswith('ard_metadata'):
             is_espa = False
         else:
-            raise RuntimeError('Un-Supported Metadata XML')
+            raise RuntimeError('Unsupported Metadata XML --> {}'
+                               .format(str(metadata.xml_object.tag)))
         del metadata
 
         if is_espa:
