@@ -1400,7 +1400,7 @@ class XMLElevation(BaseElevation):
         # Adjust the coordinates for image extents from the XML if they are
         # in center of pixel, as we need to supply the warping with actual
         # extents
-        if not self.user_extents and self.grid_origin is 'CENTER':
+        if not self.user_extents and self.grid_origin == 'CENTER':
             self.min_x_extent = (self.min_x_extent -
                                  self.pixel_resolution_x * 0.5)
             self.max_x_extent = (self.max_x_extent +
