@@ -27,7 +27,7 @@ from espa import Metadata
 from espa import ENVIHeader
 
 
-SOFTWARE_VERSION = 'ELEVATION_2.3.0'
+SOFTWARE_VERSION = 'ELEVATION_2.3.1'
 
 # Environment variable for the location of the elevation sources
 ESPA_ELEVATION_DIR = 'ESPA_ELEVATION_DIR'
@@ -428,6 +428,7 @@ class BaseElevation(object):
         self.max_y_extent = None
         self.max_x_extent = None
         self.min_y_extent = None
+        self.grid_origin = 'undefined'
 
         self.pixel_resolution_x = None
         self.pixel_resolution_y = None
@@ -1362,6 +1363,8 @@ class XMLElevation(BaseElevation):
                     self.max_x_extent = float(corner_point.attrib['x'])
                     self.min_y_extent = float(corner_point.attrib['y'])
 
+            self.grid_origin = global_metadata.projection_information.grid_origin
+
         # Read the rest of the scene metadata
         product_id = None
         for element in global_metadata.getchildren():
@@ -1394,10 +1397,10 @@ class XMLElevation(BaseElevation):
         self.number_of_lines = ref_band.attrib['nlines']
         self.number_of_samples = ref_band.attrib['nsamps']
 
-        # Adjust the coordinates for image extents from the XML because they
-        # are in center of pixel, and we need to supply the warping with actual
+        # Adjust the coordinates for image extents from the XML if they are
+        # in center of pixel, as we need to supply the warping with actual
         # extents
-        if not self.user_extents:
+        if not self.user_extents and self.grid_origin is 'CENTER':
             self.min_x_extent = (self.min_x_extent -
                                  self.pixel_resolution_x * 0.5)
             self.max_x_extent = (self.max_x_extent +

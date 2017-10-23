@@ -1,12 +1,16 @@
-## ESPA Elevation Generation Version 2.3.0 - Release Notes
+## ESPA Elevation Generation Version 2.3.1 - Release Notes
 
-See git tag [v2.3.0]
+See git tag [v2.3.1]
 
 This project contains application source code for extracting elevation data from external sources and generating an elevation product conforming to the input data. An option exists to specify a user-defined geographic extents (versus the default scene extents) to produce elevation for a different footprint from the scene.
 
 ## Release Notes
 * Version changes
-* Added support for ARD Metadata
+* Fixed a bug in the ARD handling regarding the min/max extents.  The code
+  assumed these were reported for the center of the pixel, but they are
+  actually for the UL corner of the pixel.  The fix involves checking the
+  grid_origin and only adjusts the min/max extents for warping if the origin
+  is for the CENTER of the pixel.
 
 ## Installation
 
